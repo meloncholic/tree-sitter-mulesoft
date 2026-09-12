@@ -382,10 +382,21 @@ jobs:
           npm pack --workspace=dataweave --workspace=raml --pack-destination "$RUNNER_TEMP"
           consumer="$RUNNER_TEMP/npm-consumer"
           mkdir -p "$consumer"
+          node --input-type=module - <<'JS'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          const allowScripts = { 'tree-sitter@0.25.1': true };
+          for (const grammar of ['dataweave', 'raml']) {
+            const pkg = JSON.parse(fs.readFileSync(`${grammar}/package.json`, 'utf8'));
+            allowScripts[`${pkg.name}@${pkg.version}`] = true;
+          }
+          fs.writeFileSync(path.join(process.env.RUNNER_TEMP, 'npm-consumer', 'package.json'),
+            JSON.stringify({ name: 'npm-consumer', private: true, allowScripts }));
+          JS
           cd "$consumer"
-          npm init --yes
           npm install tree-sitter@0.25.1 "$RUNNER_TEMP"/tree-sitter-*.tgz
-          node --test node_modules/tree-sitter-dataweave/bindings/node/binding_test.js node_modules/tree-sitter-raml/bindings/node/binding_test.js
+          npm --prefix node_modules/tree-sitter-dataweave test
+          npm --prefix node_modules/tree-sitter-raml test
 
   workflow-meta:
     name: Workflow and YAML checks
